@@ -1,0 +1,495 @@
+---
+title: "Assignment 2, Fall 2021"
+author: "Sophie"
+date: "10/01/2021"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+# Don't change the line below
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, 
+                      message=FALSE, fig.width=6, fig.align="center")
+# If you are using other packages, load them here. 
+# If you don't have the following packages installed,
+# please install them first. But don't include the installation
+# code here because every time you knit this document they'll 
+# be reinstalled which is not necessary!
+library(Matching)
+library(knitr)
+library(janitor)
+library(tidyverse)
+# we need to set the seed of R's random number generator, 
+# in order to produce comparable results 
+set.seed(1983)
+```
+
+# A few important notes
+
+**Option 1 for submitting your assignment**: *This method is actually preferred. This is an RMarkdown document. Did you know you can open this document in RStudio, edit it by adding your answers and code, and then knit it to a pdf? To submit your answers to this assignment, simply knit this file as a pdf and submit it as a pdf on Forum. All of your code must be included in the resulting pdf file, i.e., don't set echo = FALSE in any of your code chunks. [This](https://rstudio.com/wp-content/uploads/2015/02/rmarkdown-cheatsheet.pdf) is a cheat sheet for using Rmarkdown. If you have questions about RMarkdown, please post them on Piazza. Try knitting this document in your RStudio. You should be able to get a pdf file. At any step, you can try knitting the document and recreate a pdf. If you get an error, you might have incomplete code.*
+
+**Option 2 for submitting your assignment**: *If you are not comfortable with RMarkdown, you can also choose the Google Doc version of this assignment, make a copy of it and edit the Google doc (include your code, figures, results, and explanations) and at the end download your Google Doc as a pdf and submit the pdf file.*
+
+**Note**: *Either way (if you use Rmd and knit as pdf OR if you use Google Doc and download as pdf) you should make sure you put your name on top of the document.*
+
+**Note**: *The first time you run this document you may get an error that some packages don't exist. If you don't have the packages listed on top of this document, install them first and you won't get those errors.*
+
+**Note**: *Don't change seed in the document. The function `set.seed()` has already been set at the beginning of this document to 1983 Changing the see again to a different number will make your results not replicable.*
+
+**Note**: *You don't need to tag any additional HC or LO. The set of HCs or HOs that we will grade based on, are provided in the assignment description.*
+
+
+## QUESTION 1: Data Generating Example
+
+#### STEP 1
+
+Create a set of 500 outcome observations using a data-generating process (DGP) that incorporates two variables and a stochastic component. One of the variables should follow a normal distribution and the other should follow a uniform distribution. The stochastic component should follow a normal distribution with mean  1 and standard deviation 0.2. Now create a dependent variable that relates to the independent variables and the noise with a formula you choose.
+
+```{r}
+# Your code here
+set.seed(1983)
+# DGP two variables and an error term
+x1 <- rnorm(500, 0, 1)
+x2 <- runif(500, 0, 10)
+noise <- rnorm(500, 1, 0.2)
+
+# create a dependent variable that relates to x1 and x2
+y <- 10*x1 + 5*x2 + 10*noise
+```
+
+#### STEP 2
+
+Fit a regression model of the outcome on the two independent variables and see if the coefficients you find are similar to the ones in your DGP. Discuss your results in one or two sentences.
+
+```{r}
+set.seed(1983)
+# run linear regression model
+lm1 <- lm(y ~ x1 + x2)
+summary(lm1)
+
+```
+
+The estimate coefficient from the regression model of x1 is 10.18, which is very close to the coefficient I set in the data generation process, which is 10. And this also applies to the estimate coefficient of x2, which is 5.06. The difference comes from the noise I created in the DGP.
+
+#### STEP 3
+
+Report the confidence intervals of your coefficients using the appropriate command in R.
+
+```{r}
+# Your code here
+set.seed(1983)
+# 95% confidence intervals of the coefficients in the linear regression
+confint(lm1, level = 0.95)
+
+```
+
+
+#### STEP 4
+
+Use the simulation-based approach covered in class (the `arm` library, etc.) to find the computational 95% confidence interval of your coefficients and report them here. Set the number of simulations to 100,000.
+
+```{r}
+
+library(arm)
+set.seed(1983)
+# Create the simulation 
+sim1 <- sim(lm1, n.sims = 100000)
+
+# 95% confidence interval of intercepts, and the coefficients of x1 and x2
+sim1_intercept_ci95 <- quantile(sim1$coef[,1], probs = c(0.025, 0.975))
+sim1_x1_ci95 <-quantile(sim1$coef[,2], probs = c(0.025, 0.975))
+sim1_x2_ci95 <-quantile(sim1$coef[,3], probs = c(0.025, 0.975))
+sim1_x1_ci95
+sim1_x2_ci95
+
+```
+
+#### STEP 5
+
+Now, estimate the 95% confidence interval for the predicted outcome when your first variable is equal to 1 and the second variable is equal to -2 using the simulated coefficients you found in Step 4. 
+
+```{r}
+
+# predict the outcome based on the simulated coefficients
+
+y_hat <- sim1$coef[,1] + sim1$coef[,2]*1 +sim1$coef[,3]*(-2)
+y_hat_ci95 <- quantile(y_hat, probs = c(0.025,0.975))
+y_hat_ci95
+
+```
+
+
+#### STEP 6
+
+Now, let's do bootstrapping. Use the package `boot` or write your own for-loop to estimate the 95% confidence intervals of your two coefficients.
+
+```{r}
+# Your code here
+
+# bootsrapping the coefficient of x1
+set.seed(1983)
+storage1 <- c()
+for (i in 1:100) {
+  lm <- lm(y ~x1 + x2, data = data, subset = sample(nrow(data), replace = TRUE))  
+  storage1[i] <- lm$coefficients[2]
+}
+
+#95% confidence interval of the coefficient of x1
+boot_x1_ci95 <- quantile(storage1, probs = c(0.025,0.975))
+boot_x1_ci95
+
+# bootsrapping the coefficient of x2
+storage2 <- c()
+for (i in 1:100) {
+  lm <- lm(y ~x1 + x2, data = data, subset = sample(nrow(data), replace = TRUE))  
+  storage2[i] <- lm$coefficients[3]
+}
+
+#95% confidence interval of the coefficient of x2
+boot_x2_ci95 <- quantile(storage2, probs = c(0.025,0.975))
+boot_x2_ci95
+
+```
+
+#### STEP 7
+
+Finally, compare the 95% confidence interval of your coefficients from steps 3, 4, and 6. Which one do you trust the most? Why?
+
+The 95% confidence interval of x1 coefficients are (9.99, 10.36), (9.99, 10.36), (9.96, 10.36) respectively from step 3, 4, and 6. And the 95% confidence interval of x2 coefficients are (4.96, 5.08), (4.96, 5.08), (4.96, 5.07) respectively from step 3, 4, and 6. 
+I would trust the bootstrapping method the most. The regression model approach depends on the assumptions of the linear regression model. And the simulation approach can be less dependent on assumptions of the model. Furthermore, using bootstrapping re-sampling method, we are less dependent on the particular sample. Thus, I trust the bootstrapping approach.
+
+
+## QUESTION 2: Cross-validation
+
+In this question, we'll be working with data on the California housing market. Let's first load the data into  R from the following link
+
+```{r}
+# housing = read.csv("https://github.com/ageron/handson-ml/raw/master/datasets/housing/housing.csv")
+
+housing <-read.csv("/Users/yifanchen/housing.csv")
+
+```
+
+#### STEP 1
+
+Use the validation set approach to find which one of the following models performs better in predicting median house value. By validation set, we mean randomly divide the data into two sets. 80% in the training set and 20% in the test set and see how the models below trained on the training data perform with the test data. Which model performs better?
+
+Model 1
+`lm(median_house_value ~ housing_median_age + median_income + total_bedrooms + as.factor(ocean_proximity), data = housing)`
+
+Model 2
+`lm(median_house_value ~ housing_median_age + housing_median_age^2 + median_income + total_bedrooms + as.factor(ocean_proximity), data = housing)`
+
+```{r}
+# Your code here
+
+set.seed(1983)
+
+# remove the NA
+housing[housing ==""] <- NA
+sum(is.na(housing))
+housing <-na.omit(housing)
+summary(housing)
+
+# set the training and test set
+train <- sample(1:nrow(housing), nrow(housing)*0.8)
+housing_tr <- housing[train,]
+housing_te <- housing[-train,]
+
+# model 1
+lm1 <- lm(median_house_value ~ housing_median_age + median_income + total_bedrooms + as.factor(ocean_proximity), data = housing)
+summary(lm1)
+yhat1 <- predict(lm1, housing_te)
+rmse1 <- calc_rmse(housing_te$median_house_value, yhat1)
+
+# model 2
+lm2 <- lm(median_house_value ~ housing_median_age + I(housing_median_age^2) + median_income + total_bedrooms + as.factor(ocean_proximity), data = housing)
+yhat2 <- predict(lm2, housing_te)
+summary(lm2)
+rmse2 <- calc_rmse(housing_te$median_house_value, yhat2)
+
+# compare the RMSE of model 1 and model 2
+rmse1 - rmse2
+
+```
+
+From the analysis above, Model 1 has larger RMSE than Model 2. Thus, Model 2 is better.
+
+#### STEP 2
+
+Now, use the Leave-one-out cross-validation method to find which one of the models above performs better. Which model performs better?
+
+```{r}
+# Your code here
+
+library(boot)
+
+lm1 <- glm(median_house_value ~ housing_median_age + median_income + total_bedrooms + as.factor(ocean_proximity), data = housing)
+
+lm2 <- glm(median_house_value ~ housing_median_age + I(housing_median_age^2) + median_income + total_bedrooms + as.factor(ocean_proximity), data = housing)
+
+loocv1 <- cv.glm(housing, lm1)
+loocv1$delta[1]
+
+loocv2 <- cv.glm(housing, lm2)
+loocv2$delta[1]
+
+loocv1$delta[1] - loocv2$delta[1]
+
+```
+
+From the analysis above, Model 1 has larger cross validation error than Model 2. Thus, Model 2 is better.
+
+#### STEP 3
+
+Now, use the k-fold cross-validation method to find which one of the models above performs better. Set k to be 10. Which model performs better?
+
+```{r}
+# Your code here
+
+lm1 <- glm(median_house_value ~ housing_median_age + median_income + total_bedrooms + as.factor(ocean_proximity), data = housing)
+
+lm2 <- glm(median_house_value ~ housing_median_age + I(housing_median_age^2) + median_income + total_bedrooms + as.factor(ocean_proximity), data = housing)
+
+
+cv10_1 <- cv.glm(housing, lm1, K =10)
+cv10_1$delta[1]
+cv10_2 <- cv.glm(housing, lm2, K =10)
+cv10_2$delta[1]
+
+cv10_1$delta[1] - cv10_2$delta[1]
+
+
+```
+
+From the analysis above, Model 1 has larger cross validation error than Model 2. Thus, Model 2 is better.
+
+#### STEP 4
+
+Write a summary of the steps above and provide reasonings (at least two reasons) as to which approach (validation set, LOOCV, or k-fold) is better.
+
+I would recommend k-fold for the following reasons. First, validation set approach means we have a smaller training set as we need to set aside the test set. Statistical methods tend to perform worse when trained on smaller data set. Also, the estimate test error may be highly variable as the model depends very much on which observations get into the training set and which get into the test set. Second, the LOOCV may have high variance as each fitted model is trained on almost identical data sets. These data sets are highly correlated and averaging these will have high variance. Also, LOOCV is not that efficient as it requires much more computing power. In conclusion, k-folder is more efficient and delivers more accurate results.
+
+## QUESTION 3: Bootstrapping RCT data
+
+#### STEP 1
+
+Using the `ToothGrowth` RCT data set in R, bootstrap the 95% confidence interval of the average treatment effect of (i) dose level of Vitamin C = 0.5 mg/day vs. (ii) dose level of Vitamin C = 2 mg/day on guinea pig tooth length. Be sure to only use data from the "orange juice" delivery method. You must code your own bootstrap function. Show your results!
+
+```{r}
+# Your code here
+
+set.seed(1983)
+
+head(ToothGrowth)
+
+# confidence interval using bootstrapping
+
+oj <- filter(ToothGrowth, ToothGrowth$supp == "OJ")
+oj_0.5 <-filter(oj, oj$dose == 0.5)
+oj_2 <- filter(oj, oj$dose == 2)
+
+storage <- c()
+
+for (i in 1:100) {
+  
+  trm_0.5_resample <- oj_0.5$len[sample(1:nrow(oj_0.5), replace = TRUE)]
+  trm_2_resample <- oj_2$len[sample(1:nrow(oj_2), replace = TRUE)]
+  storage[i] <- trm_2_resample - trm_0.5_resample
+}
+
+trm_ci95_bs <- quantile(storage, probs = c(0.025,0.975))
+trm_ci95_bs
+
+
+```
+
+#### STEP 2
+
+Write a sentence or two of what the results mean.
+
+We are 95% confident that the average treatment effect of (i) dose level of Vitamin C = 0.5 mg/day vs. (ii) dose level of Vitamin C = 2 mg/day on guinea pig tooth length is between 3.6 and 21.4.
+
+## QUESTION 4: Logistic Regression
+
+In this exercise, we're going to interpret the results of a logistic regression. This is a fake dataset. This is data from admission to graduate school. First let's load the data from the following link:
+
+
+```{r}
+admission <- read.csv("https://stats.idre.ucla.edu/stat/data/binary.csv")
+```
+
+#### STEP 1
+
+Let's do a regression of the outcome variable (which is "admit") on all other variables. Then look at the summary of the regression output.
+
+```{r}
+# Your code here
+glm1 <- glm(admit ~., admission, family = binomial)
+summary(glm1)
+
+```
+
+#### STEP 2
+
+What would happen to the logit (log odds ratio) of admission if GPA score changes from 2 to 3?
+
+```{r}
+# Your code here
+
+intercept <- as.numeric(glm1$coef[1])
+gre_coef <- as.numeric(glm1$coef[2])
+gpa_coef <- as.numeric(glm1$coef[3])
+rank_coef <- as.numeric(glm1$coef[4])
+
+#Equation: logit = log(p/(1-p)) = intercept  + gre_coef*gre + gpa_coef*gpa + rank_coef*rank
+
+logit_fn <- function(gre, gpa, rank){
+  logit <- intercept + gre_coef*gre + gpa_coef*gpa + rank_coef*rank
+}
+
+# using the mean to estimate gre and rank, calculate the logit difference
+gpa2_logit <- logit_fn(mean(admission$gre), 2, mean(admission$rank))
+gpa3_logit <- logit_fn(mean(admission$gre), 3, mean(admission$rank))
+
+gpa3_logit - gpa2_logit
+
+
+# for all possible gre and rank, calculate the logit difference
+gpa2_logit_all <- logit_fn(admission$gre, 2, admission$rank)
+gpa3_logit_all <- logit_fn(admission$gre, 3, admission$rank)
+gpa_logit_diff_32 <- gpa3_logit_all - gpa2_logit_all
+
+
+```
+
+If GPA score changes from 2 to 3, the logit will increase by 0.78
+
+#### STEP 3
+
+What would happen to the logit (log odds ratio) of admission if GPA score changes from 3 to 4?
+
+```{r}
+# Your code here
+
+# using the mean to estimate gre and rank, calculate the logit difference
+gpa4_logit <- logit_fn(mean(admission$gre), 4, mean(admission$rank))
+
+gpa4_logit - gpa3_logit
+
+# for all possible gre and rank, calculate the logit difference
+gpa4_logit_all <- logit_fn(admission$gre, 4, admission$rank)
+gpa3_logit_all <- logit_fn(admission$gre, 3, admission$rank)
+gpa_logit_diff_43 <- gpa4_logit_all - gpa3_logit_all
+
+
+```
+
+If GPA score changes from 3 to 4, the logit will increase by 0.78
+
+#### STEP 4
+
+What would happen to the probability of admission if GPA score changes from 2 to 3?
+
+```{r}
+# Your code here
+
+# probability function
+prob_fn <- function(gre, gpa, rank){
+  prob <- exp(intercept + gre_coef*gre+gpa_coef*gpa+rank_coef*rank)/(1+exp(intercept + gre_coef*gre+gpa_coef*gpa+rank_coef*rank))
+}
+
+# using the mean to estimate gre and rank, calculate the probability difference
+gpa2_prob <- prob_fn(mean(admission$gre), 2, mean(admission$rank))
+gpa3_prob <- prob_fn(mean(admission$gre), 3, mean(admission$rank))
+gpa3_prob - gpa2_prob
+
+# using the median to estimate gre and rank, calculate the probability difference
+gpa2_prob2 <- prob_fn(median(admission$gre), 2, median(admission$rank))
+gpa3_prob2 <- prob_fn(median(admission$gre), 3, median(admission$rank))
+gpa3_prob2 - gpa2_prob2
+
+# for all gre and rank, calculate the probability difference
+gpa2_prob_all <- prob_fn(admission$gre, 2, admission$rank)
+gpa3_prob_all <- prob_fn(admission$gre, 3, admission$rank)
+gpa_diff_32 <- gpa3_prob_all - gpa2_prob_all
+
+# plot the probability difference
+ggplot(data = admission) + 
+  geom_point(mapping = aes(x = gre, y = gpa_diff_32, color = rank)) +
+  labs(x = "GRE score", y = "Change in Probability of admission",
+title ="What would happen to the probability of admission if GPA score changes from 2 to 3?")
+
+
+```
+
+Using the mean of the variable GRE and RANK, if GPA score changes from 2 to 3, the probability will increase by 11.25%.
+Using the median of the variable GRE and RANK, if GPA score changes from 2 to 3, the probability will increase by 13.10%.
+While the logit remains the same if GPA score chages from 2 to 3, the probability change depends also on the gre and rank.
+
+
+#### STEP 5
+
+What would happen to the probability of admission if GPA score changes from 3 to 4?
+
+```{r}
+# Your code here
+
+# using the mean to estimate gre and rank, calculate the probability difference
+gpa4_prob <- prob_fn(mean(admission$gre), 4, mean(admission$rank))
+gpa4_prob - gpa3_prob
+
+# using the median to estimate gre and rank, calculate the probability difference
+gpa4_prob2 <- prob_fn(median(admission$gre), 4, median(admission$rank))
+gpa4_prob2 - gpa3_prob2
+
+# for all gre and rank, calculate the probability difference
+gpa4_prob_all <- prob_fn(admission$gre, 4, admission$rank)
+gpa3_prob_all <- prob_fn(admission$gre, 3, admission$rank)
+gpa_diff_43 <- gpa4_prob_all - gpa3_prob_all
+
+# plot the probability difference
+ggplot(data = admission) + 
+  geom_point(mapping = aes(x = gre, y = gpa_diff_43, color = rank)) +
+  labs(x = "GRE score", y = "Change in Probability of admission",
+title ="What would happen to the probability of admission if GPA score changes from 3 to 4?")
+
+
+```
+
+Using the mean of the variable GRE and RANK, if GPA score changes from 3 to 4, the probability will increase by 16.67%.
+Using the median of the variable GRE and RANK, if GPA score changes from 3 to 4, the probability will increase by 17.99%.
+While the logit remains the same if GPA score chages from 2 to 3, the probability changes depends also on the gre and rank.
+
+
+#### STEP 6
+
+What is your conclusion based on your answers to parts 2-4?
+
+On average, holding rank and gre score constant, the odds of admission is associated with a 0.78 increase for one point increase in gpa. Thus, the logit of admission increases 0.78 if GPA score changes from 3 to 4, or from 2 to 3.
+
+The probability of admission changes differently depending on the value of gpa, gre and rank. If we assume the average gpa and the average rank, the probability of admission increases 11.25% if GPA score changes from 2 to 3, and increases 16.67% if GPA score changes from 3 to 4. If we assume the median gpa and the median rank, the probability of admission increases 13.10% if GPA score changes from 2 to 3, and increases 17.99% if GPA score changes from 3 to 4.
+
+
+
+# End of Assignment
+
+## Final Steps
+
+Before finalizing your project you'll want to be sure there are **comments in your code chunks** and **text outside of your code chunks** to explain what you're doing in each code chunk. These explanations are incredibly helpful for someone who doesn't code or someone unfamiliar to your project.
+
+You have two options for submission:
+
+1. You can complete this .rmd file, knit it to pdf and submit the resulting .pdf file on Forum.
+2. You can complete the Google Doc version of this assignment, include your code, graphs, results, and your explanations wherever necessary and download the Google Doc as a pdf file and submit the pdf file on Forum. If you choose this method, you need to make sure you will provide a link to an .R script file where your code can be found (you can host your code on Github or Google Drive). Note that links to Google Docs are not accepted as your final submission.
+
+
+### Knitting your R Markdown Document
+
+Last but not least, you'll want to **Knit your .Rmd document into a pdf document**. If you get an error, take a look at what the error says and edit your .Rmd document. Then, try to Knit again! Troubleshooting these error messages will teach you a lot about coding in R. If you get any error that doesn't make sense to you, post it on Piazza.
+
+
+Good Luck! The Teaching Team
